@@ -30,8 +30,6 @@ func Parse(path string, data []byte) string {
 
 // xmlreader is a recursive function that will unstack an array of elements
 // until reaching the desired node
-//
-// Then all the values inside this final node will be pushed appened to a
 func xmlreader(nodes []Node, stack *[]string, values *[]string) {
 	for _, n := range nodes {
 		if len(*stack) > 0 {
