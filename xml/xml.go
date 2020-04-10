@@ -9,10 +9,9 @@ import (
 	"strings"
 )
 
-// Parse returns a string representing the content of the element(s) found at the path position
-//
-// If more than one element is found, Parse will join them with a space separator
-func Parse(path string, data []byte) string {
+// Parse returns a slice of strings representing the content of the element(s)
+// found at the path position
+func Parse(path string, data []byte) []string {
 	var n Node
 
 	stack := strings.Split(path, "/")
@@ -24,27 +23,74 @@ func Parse(path string, data []byte) string {
 		panic(err)
 	}
 	values := make([]string, 0)
-	xmlreader([]Node{n}, &stack, &values)
-	return strings.Join(values, " ")
+	xmlReader([]Node{n}, &stack, &values)
+	return values
 }
 
-// xmlreader is a recursive function that will unstack an array of elements
+// ParseRecursive returns a slice of strings representing the content of the
+// element(s) found at the path position recursively
+func ParseRecursive(path string, data []byte) []string {
+	var n Node
+
+	stack := strings.Split(path, "/")
+
+	buf := bytes.NewBuffer(data)
+
+	err := xmlencode.NewDecoder(buf).Decode(&n)
+	if err != nil {
+		panic(err)
+	}
+	values := make([]string, 0)
+	xmlReaderRecursive([]Node{n}, &stack, &values)
+	return values
+}
+
+// xmlReaderRecursive is a recursive function that will unstack an array of elements
 // until reaching the desired node
-func xmlreader(nodes []Node, stack *[]string, values *[]string) {
+func xmlReaderRecursive(nodes []Node, stack *[]string, values *[]string) {
 	for _, n := range nodes {
 		if len(*stack) > 0 {
 			if !trimStackIndex(n, stack) && len(*stack) > 1 && n.XMLName.Local == (*stack)[0] {
 				*stack = (*stack)[1:]
 			}
-			if v := getValues(n, stack); v != nil {
+
+			if v := getValuesWithAttributes(n, stack, func(n Node, att string) []string {
+				v := n.valuesFromAttributes(att)
+				n.valuesRecursive(&v)
+				return v
+			}); v != nil {
+				*values = append(*values, v...)
+			}
+
+			if v := getValues(n, stack, func(n Node) []string {
+				v := []string{}
+				n.valuesRecursive(&v)
+				return v
+			}); v != nil {
+				*values = append(*values, v...)
+			}
+			xmlReaderRecursive(n.Nodes, stack, values)
+		}
+	}
+}
+
+// xmlReader is a recursive function that will unstack an array of elements
+// until reaching the desired node
+func xmlReader(nodes []Node, stack *[]string, values *[]string) {
+	for _, n := range nodes {
+		if len(*stack) > 0 {
+			if !trimStackIndex(n, stack) && len(*stack) > 1 && n.XMLName.Local == (*stack)[0] {
+				*stack = (*stack)[1:]
+			}
+			if v := getValues(n, stack, func(n Node) []string { return n.values() }); v != nil {
 				*values = append(*values, v...)
 				return
 			}
-			if v := getValuesWithAttributes(n, stack); v != nil {
+			if v := getValuesWithAttributes(n, stack, func(n Node, att string) []string { return n.valuesFromAttributes(att) }); v != nil {
 				*values = append(*values, v...)
 				return
 			}
-			xmlreader(n.Nodes, stack, values)
+			xmlReader(n.Nodes, stack, values)
 		}
 	}
 }
@@ -75,23 +121,23 @@ func trimStackIndex(n Node, stack *[]string) bool {
 }
 
 // getValues returns a slice of string holding the individual values inside the node
-func getValues(n Node, stack *[]string) []string {
+func getValues(n Node, stack *[]string, f func(Node) []string) []string {
 	if len(*stack) == 1 && n.XMLName.Local == (*stack)[0] {
 		*stack = []string{}
-		return n.values()
+		return f(n)
 	}
 	return nil
 }
 
 // getValuesWithAttributes is like getValues but matches the node's attributes
-func getValuesWithAttributes(n Node, stack *[]string) []string {
+func getValuesWithAttributes(n Node, stack *[]string, f func(Node, string) []string) []string {
 	if len(*stack) == 1 {
 		re := regexp.MustCompile(`(.*)@([a-zA-Z]+)`)
 		if re.MatchString((*stack)[0]) {
 			submatch := re.FindStringSubmatch((*stack)[0])
 			if submatch[1] == n.XMLName.Local {
 				*stack = []string{}
-				return n.valuesFromAttributes(submatch[2])
+				return f(n, submatch[2])
 			}
 		}
 	}

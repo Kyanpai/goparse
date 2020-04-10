@@ -4,6 +4,8 @@ import (
 	xmlencode "encoding/xml"
 )
 
+type Nodes []Node
+
 type Node struct {
 	XMLName xmlencode.Name
 	Content []byte           `xml:",innerxml"`
@@ -57,4 +59,19 @@ func (n Node) findAttributeValue(att string) string {
 		}
 	}
 	return ""
+}
+
+// valuesRecursive is a recursive function that get all the individual values
+// starting from a slice of node
+func (n Node) valuesRecursive(values *[]string) {
+	if len(*values) == 0 && len(n.Nodes) == 0 {
+		*values = append(*values, string(n.Content))
+	}
+
+	for _, subnode := range n.Nodes {
+		if len(subnode.Nodes) == 0 {
+			*values = append(*values, string(subnode.Content))
+		}
+		subnode.valuesRecursive(values)
+	}
 }

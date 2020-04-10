@@ -76,59 +76,123 @@ func TestParse(t *testing.T) {
 		name string
 		xml  []byte
 		path string
-		ret  string
+		ret  []string
 	}{
 		{
 			name: "depth 0",
 			xml:  simpleXml,
 			path: "root",
-			ret:  "content 0",
+			ret:  []string{"content 0"},
 		},
 		{
 			name: "depth 1",
 			xml:  simpleXml,
-			path: "root.baz",
-			ret:  "baz content 0 baz content 1",
+			path: "root/baz",
+			ret:  []string{"baz content 0", "baz content 1"},
 		},
 		{
 			name: "depth 1 with index",
 			xml:  simpleXml,
-			path: "root.foo[1]",
-			ret:  "foo content 1",
+			path: "root/foo[1]",
+			ret:  []string{"foo content 1"},
 		},
 		{
 			name: "depth 2",
 			xml:  simpleXml,
-			path: "root.foo[0].bar",
-			ret:  "john doe",
+			path: "root/foo[0]/bar",
+			ret:  []string{"john", "doe"},
 		},
 		{
 			name: "bad path format",
 			xml:  simpleXml,
-			path: "root.foo[0].",
-			ret:  "",
+			path: "root/foo[0]/",
+			ret:  []string{},
 		},
 		{
 			name: "complexe xml",
 			xml:  complexeXml,
-			path: "feed.entry[0].updated",
-			ret:  "2020-03-27T22:25:57+01:00",
+			path: "feed/entry[0]/updated",
+			ret:  []string{"2020-03-27T22:25:57+01:00"},
 		},
 		{
 			name: "complexe xml with attributes",
 			xml:  complexeXml,
-			path: "feed.entry[1].link@href",
-			ret:  "https://github.com/NeverSinkDev/NeverSink-Filter/releases/tag/7.8.1",
+			path: "feed/entry[1]/link@href",
+			ret:  []string{"https://github.com/NeverSinkDev/NeverSink-Filter/releases/tag/7.8.1"},
 		},
 		{
 			name: "complexe xml with depth and attributes",
 			xml:  complexeXml,
-			path: "feed.link[1]@href",
-			ret:  "https://github.com/NeverSinkDev/NeverSink-Filter/releases.atom",
+			path: "feed/link[1]@href",
+			ret:  []string{"https://github.com/NeverSinkDev/NeverSink-Filter/releases.atom"},
 		},
 	} {
 		t.Run(d.name, func(t *testing.T) {
 			ret := Parse(d.path, d.xml)
+			assert.Equal(t, d.ret, ret)
+		})
+	}
+}
+
+func TestParseRecursive(t *testing.T) {
+
+	for _, d := range []struct {
+		name string
+		xml  []byte
+		path string
+		ret  []string
+	}{
+		{
+			name: "depth 0",
+			xml:  simpleXml,
+			path: "root",
+			ret:  []string{"content 0", "foo content 0", "john", "doe", "baz content 0", "baz content 1", "foo content 1"},
+		},
+		{
+			name: "depth 1",
+			xml:  simpleXml,
+			path: "root/baz",
+			ret:  []string{"baz content 0", "baz content 1"},
+		},
+		{
+			name: "depth 1 with index",
+			xml:  simpleXml,
+			path: "root/foo[1]",
+			ret:  []string{"foo content 1"},
+		},
+		{
+			name: "depth 2",
+			xml:  simpleXml,
+			path: "root/foo[0]/bar",
+			ret:  []string{"john", "doe"},
+		},
+		{
+			name: "bad path format",
+			xml:  simpleXml,
+			path: "root/foo[0]/",
+			ret:  []string{},
+		},
+		{
+			name: "complexe xml",
+			xml:  complexeXml,
+			path: "feed/entry[0]/updated",
+			ret:  []string{"2020-03-27T22:25:57+01:00"},
+		},
+		{
+			name: "complexe xml with attributes",
+			xml:  complexeXml,
+			path: "feed/entry[1]/link@href",
+			ret:  []string{"https://github.com/NeverSinkDev/NeverSink-Filter/releases/tag/7.8.1"},
+		},
+		{
+			name: "complexe xml with depth and attributes",
+			xml:  complexeXml,
+			path: "feed/link[1]@href",
+			ret:  []string{"https://github.com/NeverSinkDev/NeverSink-Filter/releases.atom"},
+		},
+	} {
+		t.Run(d.name, func(t *testing.T) {
+			ret := ParseRecursive(d.path, d.xml)
 			assert.Equal(t, d.ret, ret)
 		})
 	}
