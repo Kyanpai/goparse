@@ -15,7 +15,7 @@ import (
 func Parse(path string, data []byte) string {
 	var n Node
 
-	stack := strings.Split(path, ".")
+	stack := strings.Split(path, "/")
 
 	buf := bytes.NewBuffer(data)
 
